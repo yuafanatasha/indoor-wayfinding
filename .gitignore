@@ -1,0 +1,6 @@
+node_modules/
+.env
+database/
+indoor/
+sketchup/
+public/model/111 bourke st.glb

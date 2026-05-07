@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IndoorMap</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <style>
+    :root {
+      --bg: #0d1516;
+      --cyan: #00e5ff;
+      --cyan-dim: rgba(0,229,255,0.15);
+      --text: #dce4e5;
+      --muted: #5a6e71;
+      --surface: rgba(13,21,22,0.85);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 28px 48px;
+      transition: background 0.4s, backdrop-filter 0.4s;
+    }
+    .navbar.scrolled {
+      background: rgba(13,21,22,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .nav-logo {
+      font-size: 17px; font-weight: 700; letter-spacing: -0.3px;
+      color: #f0f4f5;
+    }
+    .nav-link {
+      font-size: 13px; font-weight: 500; color: var(--muted);
+      text-decoration: none; letter-spacing: 0.3px;
+      transition: color 0.2s;
+      position: relative;
+    }
+    .nav-link::after {
+      content: ''; position: absolute; bottom: -2px; left: 0; right: 0;
+      height: 1px; background: var(--cyan);
+      transform: scaleX(0); transition: transform 0.2s;
+    }
+    .nav-link:hover { color: var(--cyan); }
+    .nav-link:hover::after { transform: scaleX(1); }
+
+    /* ── Hero / Map Section ── */
+    #hero {
+      position: relative; width: 100vw; height: 100vh;
+      overflow: hidden;
+    }
+    #map {
+      width: 100%; height: 100%;
+    }
+
+    /* vignette overlay biar map ngga terlalu bright di pinggir */
+    .map-vignette {
+      position: absolute; inset: 0; pointer-events: none; z-index: 1;
+      background: radial-gradient(ellipse at center,
+        transparent 40%,
+        rgba(13,21,22,0.6) 100%
+      );
+    }
+
+    /* ── CTA button ── */
+    .cta-wrap {
+      position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+      z-index: 10;
+    }
+    .cta-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 32px; border-radius: 9999px;
+      border: 1.5px solid var(--cyan);
+      background: transparent;
+      color: var(--text); font-size: 14px; font-weight: 500;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      cursor: pointer; letter-spacing: 0.2px;
+      backdrop-filter: blur(12px);
+      transition: background 0.25s, box-shadow 0.25s, transform 0.2s;
+      text-decoration: none;
+    }
+    .cta-btn:hover {
+      background: rgba(0,229,255,0.08);
+      box-shadow: 0 0 24px rgba(0,229,255,0.2);
+      transform: translateY(-2px);
+    }
+    .cta-arrow {
+      font-size: 16px; transition: transform 0.2s;
+    }
+    .cta-btn:hover .cta-arrow { transform: translateX(4px); }
+
+    /* loading state */
+    .map-loading {
+      position: absolute; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: var(--bg); gap: 16px;
+      transition: opacity 0.8s;
+    }
+    .map-loading.hidden { opacity: 0; pointer-events: none; }
+    .loading-name {
+      font-size: 22px; font-weight: 700; color: #f0f4f5; letter-spacing: -0.5px;
+    }
+    .loading-name span { color: var(--cyan); }
+    .loading-bar {
+      width: 160px; height: 1.5px; background: rgba(255,255,255,0.08); border-radius: 1px; overflow: hidden;
+    }
+    .loading-fill {
+      height: 100%; background: var(--cyan);
+      animation: loadbar 2s ease forwards;
+    }
+    @keyframes loadbar { from{width:0} to{width:100%} }
+    .loading-sub { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+    /* ── Footer ── */
+    footer {
+      background: #080f11;
+      padding: 64px 48px 40px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .footer-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 48px; max-width: 1100px; margin: 0 auto 48px;
+    }
+    .footer-logo { font-size: 15px; font-weight: 700; color: #f0f4f5; margin-bottom: 10px; }
+    .footer-desc { font-size: 13px; color: var(--muted); line-height: 1.7; max-width: 220px; }
+    .footer-contact-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 1.5px; color: var(--muted); margin-bottom: 8px;
+    }
+    .footer-link {
+      font-size: 13px; color: #9ab; text-decoration: none;
+      transition: color 0.2s; display: block; margin-bottom: 6px;
+    }
+    .footer-link:hover { color: var(--cyan); }
+    .footer-social {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: #9ab; text-decoration: none;
+      transition: color 0.2s; margin-bottom: 16px;
+    }
+    .footer-social:hover { color: var(--cyan); }
+    .footer-divider {
+      max-width: 1100px; margin: 0 auto 24px;
+      height: 1px; background: rgba(255,255,255,0.05);
+    }
+    .footer-bottom {
+      max-width: 1100px; margin: 0 auto;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+    }
+    .footer-copy { font-size: 11px; color: var(--muted); }
+    .footer-copy-links { display: flex; gap: 20px; }
+    .footer-copy-links a {
+      font-size: 11px; color: var(--muted); text-decoration: none; transition: color 0.2s;
+    }
+    .footer-copy-links a:hover { color: var(--cyan); }
+
+    /* maplibre attrib hide */
+    .maplibregl-ctrl-attrib { display: none !important; }
+    .maplibregl-ctrl-logo { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <header class="navbar" id="navbar">
+    <div class="nav-logo">IndoorMap</div>
+    <a href="#about" class="nav-link">About Us</a>
+  </header>
+
+  <!-- Hero: full screen map -->
+  <section id="hero">
+    <div class="map-loading" id="map-loading">
+      <div class="loading-name">Indoor<span>Map</span></div>
+      <div class="loading-bar"><div class="loading-fill"></div></div>
+      <div class="loading-sub">Memuat peta & model 3D...</div>
+    </div>
+
+    <div id="map"></div>
+    <div class="map-vignette"></div>
+
+    <div class="cta-wrap">
+      <a href="indoor.html" class="cta-btn">
+        Explore Indoor Map
+        <span class="cta-arrow">→</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer / About -->
+  <footer id="about">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-logo">IndoorMap</div>
+        <p class="footer-desc">Built for curious explorers who want to see what's inside. A small project with big maps.</p>
+      </div>
+      <div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end">
+        <a href="https://instagram.com/indoormap" class="footer-social">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+          @indoormap
+        </a>
+        <div class="footer-contact-label">Contact</div>
+        <a href="mailto:hello@indoormap.io" class="footer-link">hello@indoormap.io</a>
+      </div>
+    </div>
+    <div class="footer-divider"></div>
+    <div class="footer-bottom">
+      <span class="footer-copy">© 2025 IndoorMap. Made with love and too much coffee.</span>
+      <div class="footer-copy-links">
+        <a href="#">Twitter</a>
+        <a href="#">Support</a>
+        <a href="#">Privacy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ── Navbar scroll effect ──────────────────────────────────────────
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // ── Map ───────────────────────────────────────────────────────────
+    const CENTER_LNG = 144.969339;
+    const CENTER_LAT = -37.812530;
+    const TRUE_NORTH_OFFSET = 19.17; // bearing offset dari Sketchup
+
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json',
+        center: [CENTER_LNG, CENTER_LAT],
+        zoom: 17.5,
+        pitch: 55,
+        bearing: TRUE_NORTH_OFFSET,
+        antialias: true,
+        maxPitch: 85,        // tambah ini — default 60, max 85
+        pitchWithRotate: true
+    });
+    
+    map.on('load', () => {
+        // Hapus semua layer label/symbol
+        const layers = map.getStyle().layers;
+        layers.forEach(layer => {
+            if (layer.type === 'symbol') {
+            map.removeLayer(layer.id);
+            }
+        });
+
+        map.addLayer(customLayer);
+        setTimeout(() => {
+            document.getElementById('map-loading').classList.add('hidden');
+        }, 2500);
+    });
+
+    // ── Load GLB via Three.js Custom Layer ───────────────────────────
+    const MODEL_URL = '/model/111 bourke st_2.glb'; // taruh GLB di public/models/building.glb
+
+    // Convert lat/lng ke mercator coords
+    function latLngToMercator(lng, lat) {
+      const x = (lng + 180) / 360;
+      const y = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2;
+      return { x: x * (1 << 25) * Math.PI * 2, y: y * (1 << 25) * Math.PI * 2 };
+    }
+
+    const modelOrigin = [CENTER_LNG, CENTER_LAT];
+    const modelAltitude = 0; // elevation dari Sketchup
+    const modelRotate = [Math.PI / 2, 0, 0];
+
+    const modelAsMercatorCoordinate = maplibregl.MercatorCoordinate.fromLngLat(modelOrigin, modelAltitude);
+    const modelTransform = {
+      translateX: modelAsMercatorCoordinate.x,
+      translateY: modelAsMercatorCoordinate.y,
+      translateZ: modelAsMercatorCoordinate.z,
+      rotateX: modelRotate[0],
+      rotateY: modelRotate[1],
+      rotateZ: modelRotate[2],
+      scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
+    };
+
+    const customLayer = {
+      id: 'glb-building',
+      type: 'custom',
+      renderingMode: '3d',
+
+      onAdd(map, gl) {
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        this.scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0x00e5ff, 0.6);
+        dirLight.position.set(0, -70, 100).normalize();
+        this.scene.add(dirLight);
+
+        const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+        dirLight2.position.set(70, 70, 50).normalize();
+        this.scene.add(dirLight2);
+
+        // Load GLB
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+          MODEL_URL,
+          (gltf) => {
+            this.scene.add(gltf.scene);
+            // Hide loading screen setelah model loaded
+            document.getElementById('map-loading').classList.add('hidden');
+          },
+          undefined,
+          (err) => {
+            console.error('GLB load error:', err);
+            // Tetap hide loading meskipun model gagal
+            document.getElementById('map-loading').classList.add('hidden');
+          }
+        );
+
+        this.map = map;
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: map.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        this.renderer.autoClear = false;
+      },
+
+      render(gl, matrix) {
+        const rotX = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(1, 0, 0), modelTransform.rotateX);
+        const rotY = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(0, 1, 0), modelTransform.rotateY);
+        const rotZ = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(0, 0, 1), modelTransform.rotateZ);
+
+        const m = new THREE.Matrix4().fromArray(matrix);
+        const l = new THREE.Matrix4()
+          .makeTranslation(modelTransform.translateX, modelTransform.translateY, modelTransform.translateZ)
+          .scale(new THREE.Vector3(modelTransform.scale, -modelTransform.scale, modelTransform.scale))
+          .multiply(rotX).multiply(rotY).multiply(rotZ);
+
+        this.camera.projectionMatrix = m.multiply(l);
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+        this.map.triggerRepaint();
+      }
+    };
+
+    map.on('load', () => {
+      map.addLayer(customLayer);
+
+      // Kalau model URL tidak tersedia, hide loading setelah map load
+      setTimeout(() => {
+        document.getElementById('map-loading').classList.add('hidden');
+      }, 2500);
+    });
+  </script>
+
+</body>
+</html>
