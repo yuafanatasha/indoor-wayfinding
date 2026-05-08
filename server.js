@@ -137,7 +137,7 @@ app.get('/api/route', async (req, res) => {
   }
 
   const scriptPath = path.join(__dirname, 'routing.py');
-  const py = spawn('python', [
+  const py = spawn('python3', [
     scriptPath,
     '--from',  from,
     '--to',    to,
@@ -171,6 +171,20 @@ app.get('/api/route', async (req, res) => {
     } catch (e) {
       res.status(500).json({ error: 'Output Python tidak valid JSON', raw: result });
     }
+  });
+});
+
+app.get('/api/debug', (req, res) => {
+  const { spawn } = require('child_process');
+  const py = spawn('python3', ['--version']);
+  let out = '', err = '';
+  py.stdout.on('data', d => out += d);
+  py.stderr.on('data', d => err += d);
+  py.on('close', code => {
+    res.json({ code, out, err, 
+      cwd: process.cwd(),
+      files: require('fs').readdirSync('.') 
+    });
   });
 });
 
