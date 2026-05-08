@@ -137,7 +137,7 @@ app.get('/api/route', async (req, res) => {
   }
 
   const scriptPath = path.join(__dirname, 'routing.py');
-  const py = spawn('C:\\Users\\yuafa\\anaconda3\\envs\\dl_gpu\\python.exe', [
+  const py = spawn('python3', [
     scriptPath,
     '--from',  from,
     '--to',    to,
