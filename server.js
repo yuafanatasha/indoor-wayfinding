@@ -137,7 +137,7 @@ app.get('/api/route', async (req, res) => {
   }
 
   const scriptPath = path.join(__dirname, 'routing.py');
-  const py = spawn('python3', [
+  const py = spawn('python', [
     scriptPath,
     '--from',  from,
     '--to',    to,
@@ -149,6 +149,15 @@ app.get('/api/route', async (req, res) => {
 
   py.stdout.on('data', (data) => result += data.toString());
   py.stderr.on('data', (data) => errMsg += data.toString());
+
+  py.on('error', (err) => {
+    console.error('Spawn error:', err);
+
+    return res.status(500).json({
+      error: 'Gagal menjalankan Python',
+      detail: err.message
+    });
+  });
 
   py.on('close', (code) => {
     if (code !== 0) {
