@@ -188,6 +188,15 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
+app.get('/api/debug2', (req, res) => {
+  const { spawn } = require('child_process');
+  const py = spawn('python3', ['-c', 'import geopandas; import networkx; import pyproj; import sqlalchemy; print("OK")']);
+  let out = '', err = '';
+  py.stdout.on('data', d => out += d);
+  py.stderr.on('data', d => err += d);
+  py.on('close', code => res.json({ code, out, err }));
+});
+
 app.listen(3000, () => {
   console.log('Server jalan di http://localhost:3000');
 });
