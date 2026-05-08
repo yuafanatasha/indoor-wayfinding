@@ -503,19 +503,48 @@ document.addEventListener('click', (e) => {
 // ── Routing — PERUBAHAN: kirim floor ke API ─────────────────
 async function startRoute() {
   if (!startPOI || !endPOI) return;
+
   if (startPOI.floor !== endPOI.floor) {
     alert('Start dan destination harus di lantai yang sama.');
     return;
   }
+
   const btn = document.getElementById('route-btn');
-  btn.textContent = 'Menghitung...'; btn.disabled = true;
+  btn.textContent = 'Menghitung...';
+  btn.disabled = true;
+
   try {
-    const floor  = startPOI.floor;
-    const result = await fetch(`${API}/api/route?from=${startPOI.id}&to=${endPOI.id}&floor=${floor}`).then(r=>r.json());
-    if (result.error) { alert('Error: ' + result.error); return; }
+    const floor = startPOI.floor;
+
+    const response = await fetch(
+      `${API}/api/route?from=${startPOI.id}&to=${endPOI.id}&floor=${floor}`
+    );
+
+    const text = await response.text();
+
+    console.log(text);
+
+    let result;
+
+    try {
+      result = JSON.parse(text);
+    } catch {
+      throw new Error('Response bukan JSON: ' + text.slice(0,200));
+    }
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
     renderRoute(result);
-  } catch(e) { alert('Routing gagal: ' + e.message); }
-  finally { btn.textContent = 'Start Routing'; btn.disabled = false; }
+
+  } catch(e) {
+    console.error(e);
+    alert('Routing gagal: ' + e.message);
+  } finally {
+    btn.textContent = 'Start Routing';
+    btn.disabled = false;
+  }
 }
 
 function renderRoute(result) {
