@@ -4,4 +4,3 @@ shapely
 sqlalchemy
 pyproj
 psycopg2-binary
-fiona
