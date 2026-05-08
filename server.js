@@ -197,6 +197,21 @@ app.get('/api/debug2', (req, res) => {
   py.on('close', code => res.json({ code, out, err }));
 });
 
+app.get('/api/debug4', (req, res) => {
+  const { spawn } = require('child_process');
+  const path = require('path');
+  const scriptPath = path.join(__dirname, 'routing.py');
+  const py = spawn('python3', [scriptPath, '--from', '1', '--to', '5', '--floor', '111'], {
+    env: { ...process.env }  // pastikan env variables diteruskan ke Python
+  });
+  let out = '', err = '';
+  py.stdout.on('data', d => out += d);
+  py.stderr.on('data', d => err += d);
+  py.on('close', code => res.json({ code, out: out.substring(0,500), err: err.substring(0,1000) }));
+});
+
+
+
 app.listen(3000, () => {
   console.log('Server jalan di http://localhost:3000');
 });
